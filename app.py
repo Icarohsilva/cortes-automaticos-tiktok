@@ -23,6 +23,9 @@ logo_file = st.file_uploader("📷 Faça upload da logo (PNG com fundo transpare
 
 gerar = st.button("🎬 Gerar cortes")
 
+titulo_video = st.text_input("🎬 Título do vídeo (aparece no topo de cada parte):", placeholder="Ex: A guerra dos códigos")
+
+
 if gerar and url:
     criar_pastas()
     caminho = os.path.join(PASTA_ORIGINAL, NOME_VIDEO)
@@ -43,7 +46,7 @@ if gerar and url:
     with st.spinner("✂️ Processando cortes..."):
         from cortar_video import DURACAO_POR_PARTE
         DURACAO_POR_PARTE = duracao  # Atualiza config
-        total, ok = processar_video(caminho)
+        total, ok = processar_video(caminho, titulo=titulo_video)
 
     st.success(f"✅ {ok}/{total} partes geradas com sucesso!")
 

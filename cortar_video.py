@@ -6,6 +6,7 @@ import yt_dlp
 from moviepy import VideoFileClip, ImageClip, CompositeVideoClip, ColorClip
 from moviepy.video.fx.Resize import Resize
 from moviepy.video.fx.Margin import Margin
+from thumbnail_generator import gerar_thumbnail
 
 # ========== CONFIGURAÇÕES ==========
 URL = "https://youtu.be/ErMSHiQRnc8?feature=shared"  # URL do vídeo do YouTube
@@ -13,6 +14,7 @@ DURACAO_POR_PARTE = 100  # segundos
 PASTA_ORIGINAL = "original"
 PASTA_CORTES = "cortes"
 PASTA_ASSETS = "assets"
+PASTA_THUMBNAILS = "thumbnails"
 LOGO_PATH = os.path.join(PASTA_ASSETS, "logo.png")
 NOME_VIDEO = "video_original.mp4"
 RESOLUCAO_FINAL = (1080, 1920)
@@ -28,6 +30,7 @@ def criar_pastas() -> None:
     os.makedirs(PASTA_ORIGINAL, exist_ok=True)
     os.makedirs(PASTA_CORTES, exist_ok=True)
     os.makedirs(PASTA_ASSETS, exist_ok=True)
+    os.makedirs(PASTA_THUMBNAILS, exist_ok=True)
     logger.info("📁 Pastas preparadas.")
 
 def baixar_video(url: str, caminho_saida: str) -> bool:
@@ -48,15 +51,9 @@ def baixar_video(url: str, caminho_saida: str) -> bool:
         return False
 
 def formatar_para_tiktok(clip: VideoFileClip) -> CompositeVideoClip:
-    # Redimensiona o vídeo para caber dentro da resolução final, mantendo a proporção
     clip_redimensionado = clip.resized(height=RESOLUCAO_FINAL[1]) if clip.w / clip.h < RESOLUCAO_FINAL[0] / RESOLUCAO_FINAL[1] else clip.resized(width=RESOLUCAO_FINAL[0])
-
-    # Cria fundo preto (tarja) com a resolução final
     fundo = ColorClip(size=RESOLUCAO_FINAL, color=(0, 0, 0), duration=clip.duration)
-
-    # Centraliza o vídeo redimensionado no fundo
     video_final = CompositeVideoClip([fundo, clip_redimensionado.with_position("center")])
-
     return video_final.with_duration(clip.duration).with_audio(clip.audio)
 
 def aplicar_marca_dagua(clip: VideoFileClip, caminho_logo: str = LOGO_PATH) -> VideoFileClip:
@@ -65,19 +62,12 @@ def aplicar_marca_dagua(clip: VideoFileClip, caminho_logo: str = LOGO_PATH) -> V
         return clip
 
     try:
-        # Aumentar o tamanho da logo proporcionalmente (por exemplo: 300px de altura)
         logo = ImageClip(caminho_logo).resized(height=300)
-
-        # Centraliza na parte inferior (bottom center)
         largura_video = RESOLUCAO_FINAL[0]
         largura_logo = logo.w
-        posicao_centralizada = ((largura_video - largura_logo) // 2, RESOLUCAO_FINAL[1] - logo.h - 50)  # 50px do fundo
-
-        # Define duração e opacidade
+        posicao_centralizada = ((largura_video - largura_logo) // 2, RESOLUCAO_FINAL[1] - logo.h - 50)
         logo = logo.with_duration(clip.duration).with_opacity(0.9).with_position(posicao_centralizada)
-
         return CompositeVideoClip([clip, logo], size=RESOLUCAO_FINAL)
-
     except Exception as e:
         logger.warning(f"⚠️ Falha ao aplicar marca d'água: {e}")
         return clip
@@ -111,7 +101,7 @@ def processar_video(caminho_video: str) -> Tuple[int, int]:
                 if i == 0:
                     inicio = 0
                 else:
-                    inicio = max(i * DURACAO_POR_PARTE - 5, 0)  # Começa 5s antes do fim da parte anterior
+                    inicio = max(i * DURACAO_POR_PARTE - 5, 0)
 
                 fim = min((i + 1) * DURACAO_POR_PARTE, duracao_total)
                 parte = clip.subclipped(inicio, fim)
@@ -123,6 +113,7 @@ def processar_video(caminho_video: str) -> Tuple[int, int]:
                 caminho_saida = os.path.join(PASTA_CORTES, f"parte_{i + 1}.mp4")
                 if exportar_video(parte_com_logo, caminho_saida):
                     logger.info(f"✅ Parte {i + 1} exportada: {caminho_saida}")
+                    gerar_thumbnail(caminho_saida, f"Parte {i + 1}", i + 1)
                     sucesso += 1
 
                 parte.close()
